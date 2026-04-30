@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>What Movies Are on Top?</title>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 30px;
+    }
+
+    h2 {
+      margin-bottom: 5px;
+    }
+
+    button {
+      margin: 5px;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+
+    svg {
+      margin-top: 20px;
+    }
+
+    .bar {
+      fill: steelblue;
+    }
+
+    .bar:hover {
+      fill: darkorange;
+    }
+
+    .label {
+      font-size: 12px;
+      fill: black;
+    }
+
+    .axis-label {
+      font-size: 14px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h2 id="chart-title">Top Movies by Rating</h2>
+  <p>Click a button to see which movies rank highest by rating, popularity, or vote count.</p>
+
+  <button onclick="updateChart('vote_average')">Rating</button>
+  <button onclick="updateChart('popularity')">Popularity</button>
+  <button onclick="updateChart('vote_count')">Vote Count</button>
+
+  <br>
+
+  <svg width="1000" height="650"></svg>
+
+  <script>
+    const svg = d3.select("svg");
+
+    const width = 1000;
+    const height = 650;
+
+    const margin = {
+      top: 50,
+      right: 30,
+      bottom: 180,
+      left: 80
+    };
+
+    const chartWidth = width - margin.left - margin.right;
+    const chartHeight = height - margin.top - margin.bottom;
+
+    const chart = svg.append("g")
+      .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+    let allData;
+
+    d3.csv("top_rated_movies.csv").then(data => {
+      data.forEach(d => {
+        d.vote_average = +d.vote_average;
+        d.vote_count = +d.vote_count;
+        d.popularity = +d.popularity;
+      });
+
+      allData = data;
+      updateChart("vote_average");
+    });
+
+    function updateChart(metric) {
+      chart.selectAll("*").remove();
+
+      const data = [...allData]
+        .sort((a, b) => b[metric] - a[metric])
+        .slice(0, 10);
+
+      const metricNames = {
+        vote_average: "Rating",
+        popularity: "Popularity",
+        vote_count: "Vote Count"
+      };
+
+      d3.select("#chart-title")
+        .text(`Top Movies by ${metricNames[metric]}`);
+
+      const x = d3.scaleBand()
+        .domain(data.map(d => d.title))
+        .range([0, chartWidth])
+        .padding(0.2);
+
+      const y = d3.scaleLinear()
+        .domain([0, d3.max(data, d => d[metric]) * 1.1])
+        .range([chartHeight, 0]);
+
+      chart.selectAll(".bar")
+        .data(data)
+        .enter()
+        .append("rect")
+        .attr("class", "bar")
+        .attr("x", d => x(d.title))
+        .attr("y", d => y(d[metric]))
+        .attr("width", x.bandwidth())
+        .attr("height", d => chartHeight - y(d[metric]));
+
+      chart.selectAll(".label")
+        .data(data)
+        .enter()
+        .append("text")
+        .attr("class", "label")
+        .attr("x", d => x(d.title) + x.bandwidth() / 2)
+        .attr("y", d => y(d[metric]) - 8)
+        .attr("text-anchor", "middle")
+        .text(d => metric === "vote_count" ? d[metric].toLocaleString() : d[metric].toFixed(1));
+
+      chart.append("g")
+        .attr("transform", `translate(0, ${chartHeight})`)
+        .call(d3.axisBottom(x))
+        .selectAll("text")
+        .attr("transform", "rotate(-40)")
+        .style("text-anchor", "end")
+        .style("font-size", "11px");
+
+      chart.append("g")
+        .call(d3.axisLeft(y));
+
+      chart.append("text")
+        .attr("class", "axis-label")
+        .attr("x", chartWidth / 2)
+        .attr("y", chartHeight + 140)
+        .attr("text-anchor", "middle")
+        .text("Movie Title");
+
+      chart.append("text")
+        .attr("class", "axis-label")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -chartHeight / 2)
+        .attr("y", -55)
+        .attr("text-anchor", "middle")
+        .text(metricNames[metric]);
+    }
+  </script>
+
+</body>
+</html>
